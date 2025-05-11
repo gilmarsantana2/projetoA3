@@ -23,9 +23,11 @@ public class ServerThread extends Thread {
 
             String idName = server.getId().toString();
 
-            server.outputStreams.put(socket, output);
-            server.clients.put(idName, output);
-            server.addId();
+            //server.outputStreams.put(socket, output);
+            //server.clients.put(idName, output);
+            //server.addId();
+
+            server.setOutputCliente(output);
 
             sendPrivately("#" + idName);
 
@@ -55,7 +57,7 @@ public class ServerThread extends Thread {
 
                 System.out.println(message);
             } catch (IOException e) {
-                System.out.println("Erro ao enviar msg");
+                System.out.println("Erro ao enviar msg ServerThread");
             }
         }).start();
     }

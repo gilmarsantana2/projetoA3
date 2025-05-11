@@ -2,7 +2,7 @@ package controlador;
 
 import java.io.IOException;
 
-public class NativeWringPI {
+public class NativeWiringPI {
 
     static{
         try {
@@ -13,8 +13,7 @@ public class NativeWringPI {
     }
 
     /*
-    * gcc -o libpin.so -shared -I/usr/lib/jvm/java-11-openjdk-armhf/include
-    *  -I/usr/lib/jvm/java-11-openjdk-armhf/include/linux /home/pi/Downloads/pin.c -lwiringPi
+    * gcc -o libpin.so -shared -I/usr/lib/jvm/java-11-openjdk-armhf/include -I/usr/lib/jvm/java-11-openjdk-armhf/include/linux -lwiringPi /home/pi/Downloads/pin.c
     * */
 
     public static final int STATE_LOW = 0;
@@ -29,5 +28,9 @@ public class NativeWringPI {
     public native void digitalWrite(int address, int state);
 
     public native int digitalRead(int address);
+
+    public native void init();
+
+    public native void cleanup(int pin);
 
 }

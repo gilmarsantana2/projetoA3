@@ -9,6 +9,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Server {
 
@@ -16,9 +17,10 @@ public class Server {
     private ServerSocket serverSocket;
     private String adress;
     private int porta;
-    public Hashtable<Socket, ObjectOutputStream> outputStreams;
-    public Hashtable<String, ObjectOutputStream> clients;
-    private volatile boolean running;
+    //public Hashtable<Socket, ObjectOutputStream> outputStreams;
+    //public Hashtable<String, ObjectOutputStream> clients;
+    private ObjectOutputStream outputCliente;
+    private AtomicBoolean running;
     private ControladorRaspberry cr;
     private Integer id = 0;
 
@@ -28,22 +30,22 @@ public class Server {
     }
 
     //Waiting for clients to connect
-    public void ligarServidor(ControladorRaspberry cr) {
+    public void ligarServidor() {
+
         try {
             serverSocket = new ServerSocket();
             if (!serverSocket.isBound()) {
                 serverSocket.bind(new InetSocketAddress(adress, porta), 50);
             }
             System.out.println("Servido Raspberry ligado!");
-            this.cr = cr;
-            running = true;
+            running = new AtomicBoolean(true);
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("Erro ao criar servidor \"Class servidor.Server\"");
             System.exit(0);
         }
 
-        while (running) {
+        while (running.get()) {
             try {
                 socket = serverSocket.accept();
                 new ServerThread(this, socket).start();
@@ -58,15 +60,36 @@ public class Server {
      * #s -> iniciar escaneamento
      * #p -> parar escaneamento
      * #r -> resultado do escaneamento
-     * */
+     * #a -> parar alarme
+     * #f -> falha detectada
+     * #x -> Sair da aplicação
+     */
 
-    public void tratarComando(String mensagem){
+    public void tratarComando(String mensagem) {
+        System.out.println("Comando recebido: " + mensagem);
 
-
+        if (mensagem.startsWith("#s")) {
+            cr = new ControladorRaspberry(this);
+            cr.start();
+        }
+        if (mensagem.startsWith("#p")) {
+            cr.pararMotor(false);
+            cr.alarmRunning.set(false);
+        }
+        if (mensagem.startsWith("#a")) {
+            cr.alarmeStarted.set(false);
+            cr.alarmRunning.set(false);
+        }
+        if (mensagem.startsWith("#x")) {
+            cr.pararMotor(false);
+            cr.cleanup();
+            desligarServer();
+            System.exit(0);
+        }
     }
 
 
-    public void sendToAll(String data) {
+    /*public void sendToAll(String data) {
         for (Enumeration<ObjectOutputStream> e = getOutputStreams(); e.hasMoreElements(); ) {
             //since we don't want server to remove one client and at the same time sending message to it
             synchronized (outputStreams) {
@@ -81,17 +104,31 @@ public class Server {
                 }).start();
             }
         }
-    }
+    }*/
 
-    //To get Output Stream of the available clients from the hash table
+    /*//To get Output Stream of the available clients from the hash table
     private Enumeration<ObjectOutputStream> getOutputStreams() {
         return outputStreams.elements();
+    }*/
+
+
+    public synchronized void send(String message) {
+        new Thread(() -> {
+            try {
+                outputCliente.writeObject(message);
+                outputCliente.flush();
+
+                System.out.println(message);
+            } catch (IOException e) {
+                System.out.println("Erro ao enviar msg metodo Send");
+            }
+        }).start();
     }
 
     public boolean desligarServer() {
         try {
             if (serverSocket != null) {
-                running = false;
+                running.set(false);
                 serverSocket.close();
             }
             return true;
@@ -101,7 +138,7 @@ public class Server {
     }
 
     public boolean isRunning() {
-        return this.running;
+        return this.running.get();
     }
 
     public Integer getId() {
@@ -110,5 +147,13 @@ public class Server {
 
     public void addId() {
         this.id++;
+    }
+
+    public ObjectOutputStream getOutputCliente() {
+        return outputCliente;
+    }
+
+    public void setOutputCliente(ObjectOutputStream outputCliente) {
+        this.outputCliente = outputCliente;
     }
 }
