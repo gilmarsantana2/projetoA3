@@ -1,18 +1,13 @@
 package controlador;
 
-import servidor.Server;
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
 
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+public class Calibrador {
 
-public class ControladorRaspberry extends Thread {
-    private Server server;
+
     private final NativeWiringPI pi;
-    public AtomicBoolean alarmeStarted;
-    private AtomicBoolean running;
-    public AtomicBoolean alarmRunning;
-
+    private boolean running;
     private static final int PIN_LED_RED = 0;//17,11
     private static final int PIN_LED_GREEN = 3;//22,13
     private static final int PIN_LED_BLUE = 2;//27,15
@@ -24,14 +19,58 @@ public class ControladorRaspberry extends Thread {
     private static final int PIN_S0 = 16;
     private static final int BUZZER_VCC = 10;
     private static final int BUZZER_IO = 6;
-    private static final int MOTOR_PIN = 21;
 
-    public ControladorRaspberry(Server server) {
+    public Calibrador() {
         this.pi = new NativeWiringPI();
-        this.server = server;
-        alarmeStarted = new AtomicBoolean(false);
-        running = new AtomicBoolean(true);
-        alarmRunning = new AtomicBoolean(true);
+        running = true;
+
+    }
+
+    public static void main(String[] args) {
+        var calibrador = new Calibrador();
+        calibrador.run();
+    }
+
+    public void run() {
+        setup();
+        SignalHandler handler = sig -> {
+            System.out.println("Ctrl+C detected. Exiting...");
+            cleanup();
+            running = false;
+            System.exit(0); // Exit gracefully
+        };
+
+        Signal.handle(new Signal("INT"), handler);
+
+        while (running) {
+            var vermelho = lerVermelho();
+            var azul = lerAzul();
+            var verde = lerVerde();
+            System.out.println("Valor de Vermelho: " + vermelho);
+            System.out.println("Valor de Verde: " + verde);
+            System.out.println("Valor de Azul: " + azul);
+            if (vermelho >= 10 && verde < 5 && azul < 5) {
+                System.out.println("Vermelho Detectado!");
+            }
+            if (verde >= 10 && vermelho < 6 && azul < 6) {
+                System.out.println("Verde Detectado!");
+            }
+            if (azul >= 10 && vermelho < 3 && verde < 6) {
+                System.out.println("Azul Detectado!");
+            }
+            if (vermelho > 15 && verde >= 5 && verde < 10 && azul < 6) {
+                System.out.println("Laranja Detectado!");
+            }
+            if (vermelho > 15 && verde > 10 && azul < 10) {
+                System.out.println("Amarelo Detectado!");
+            }
+            if (vermelho > 15 && verde > 15 && azul > 15) {
+                System.out.println("Branco Detectado!");
+            }
+            if (vermelho<5 && verde <5 && azul< 5){
+                System.out.println("Preto Detectado!");
+            }
+        }
     }
 
     public void setup() {
@@ -46,7 +85,6 @@ public class ControladorRaspberry extends Thread {
         pi.createOutput(PIN_S1, NativeWiringPI.STATE_HIGH);
         pi.createOutput(BUZZER_VCC, NativeWiringPI.STATE_HIGH);
         pi.createOutput(BUZZER_IO, NativeWiringPI.STATE_HIGH);
-        pi.createOutput(MOTOR_PIN, NativeWiringPI.STATE_LOW);
     }
 
     public void cleanup() {
@@ -60,7 +98,6 @@ public class ControladorRaspberry extends Thread {
         pi.digitalWrite(PIN_S1, NativeWiringPI.STATE_LOW);
         pi.digitalWrite(BUZZER_VCC, NativeWiringPI.STATE_LOW);
         pi.digitalWrite(BUZZER_IO, NativeWiringPI.STATE_LOW);
-        pi.digitalWrite(MOTOR_PIN, NativeWiringPI.STATE_LOW);
         pi.cleanup(PIN_LED_RED);
         pi.cleanup(PIN_LED_BLUE);
         pi.cleanup(PIN_LED_GREEN);
@@ -71,83 +108,6 @@ public class ControladorRaspberry extends Thread {
         pi.cleanup(PIN_S1);
         pi.cleanup(BUZZER_VCC);
         pi.cleanup(BUZZER_IO);
-        pi.cleanup(MOTOR_PIN);
-    }
-
-    @Override
-    public void run() {
-        setup();
-        initAlarme();
-        pi.digitalWrite(MOTOR_PIN, NativeWiringPI.STATE_HIGH);
-
-        while (running.get()) {
-            var vermelho = lerVermelho();
-            var azul = lerAzul();
-            var verde = lerVerde();
-            if (vermelho > azul && vermelho > verde) {
-                System.out.println("Vermelho Detectado");
-                pi.digitalWrite(PIN_LED_RED, NativeWiringPI.STATE_HIGH);
-                pi.digitalWrite(PIN_LED_BLUE, NativeWiringPI.STATE_LOW);
-                pi.digitalWrite(PIN_LED_GREEN, NativeWiringPI.STATE_LOW);
-                pararMotor(true);
-                alarmeStarted.set(true);
-            } else if (azul > vermelho && azul > verde) {
-                System.out.println("Azul Detectado");
-                countBlue++;
-                resultado("#r");
-                pi.digitalWrite(PIN_LED_BLUE, NativeWiringPI.STATE_HIGH);
-                pi.digitalWrite(PIN_LED_RED, NativeWiringPI.STATE_LOW);
-                pi.digitalWrite(PIN_LED_GREEN, NativeWiringPI.STATE_LOW);
-            } else if (verde > vermelho && verde > azul) {
-                System.out.println("Verde Detectado");
-                countGreen++;
-                resultado("#r");
-                pi.digitalWrite(PIN_LED_GREEN, NativeWiringPI.STATE_HIGH);
-                pi.digitalWrite(PIN_LED_BLUE, NativeWiringPI.STATE_LOW);
-                pi.digitalWrite(PIN_LED_RED, NativeWiringPI.STATE_LOW);
-            }
-        }
-
-        System.out.println("Scaneamento Finalizado");
-    }
-
-    public void initAlarme() {
-        new Thread(() -> {
-            while (alarmRunning.get()) {
-                if (alarmeStarted.get()) {
-                    pi.digitalWrite(BUZZER_IO, NativeWiringPI.STATE_LOW);
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                    pi.digitalWrite(BUZZER_IO, NativeWiringPI.STATE_HIGH);
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            }
-            System.out.println("Thread de alarme desligada");
-            running.set(false);
-        }).start();
-
-    }
-
-    public void pararMotor(boolean falha) {
-        if (falha){
-            //todo parar motor
-            pi.digitalWrite(MOTOR_PIN, NativeWiringPI.STATE_LOW);
-            countRed++;
-            resultado("#f");
-            running.set(false);
-        }else {
-            //todo
-            pi.digitalWrite(MOTOR_PIN, NativeWiringPI.STATE_LOW);
-            running.set(false);
-            System.out.println("Motor Pausado Pelo Operador!");
-        }
     }
 
     public long lerVermelho() {
@@ -171,6 +131,7 @@ public class ControladorRaspberry extends Thread {
         }
 
         var duracao = System.currentTimeMillis() - start;
+
         try {
             return (20 / duracao);
         } catch (ArithmeticException e) {
@@ -234,19 +195,4 @@ public class ControladorRaspberry extends Thread {
         }
     }
 
-    private int countRed = 0;
-    private int countBlue = 0;
-    private int countGreen = 0;
-
-    public void resultado(String resumo) {
-        new Thread(() -> {
-            StringBuilder sb = new StringBuilder(resumo);
-            sb.append("Resumo de Scaneamento!");
-            sb.append("\nPeças Azuis detectadas: ").append(countBlue);
-            sb.append("\nPeças Verdes detectadas: ").append(countGreen);
-            sb.append("\nPeças Vermelhas detectadas: ").append(countRed);
-
-            server.send(sb.toString());
-        }).start();
-    }
 }
