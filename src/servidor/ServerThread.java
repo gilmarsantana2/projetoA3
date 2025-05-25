@@ -12,7 +12,7 @@ public class ServerThread extends Thread {
 
 
     public ServerThread(Server server, Socket socket) {
-        // TODO Auto-generated constructor stub
+
         this.server = server;
         this.socket = socket;
         System.out.println("Cliente conectado!");
@@ -20,17 +20,7 @@ public class ServerThread extends Thread {
             output = new ObjectOutputStream(this.socket.getOutputStream());
             output.flush();
             input = new ObjectInputStream(this.socket.getInputStream());
-
-            String idName = server.getId().toString();
-
-            //server.outputStreams.put(socket, output);
-            //server.clients.put(idName, output);
-            //server.addId();
-
             server.setOutputCliente(output);
-
-            sendPrivately("#" + idName);
-
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -49,16 +39,4 @@ public class ServerThread extends Thread {
         }
     }
 
-    public synchronized void sendPrivately(String message) {
-        new Thread(() -> {
-            try {
-                output.writeObject(message);
-                output.flush();
-
-                System.out.println(message);
-            } catch (IOException e) {
-                System.out.println("Erro ao enviar msg ServerThread");
-            }
-        }).start();
-    }
 }

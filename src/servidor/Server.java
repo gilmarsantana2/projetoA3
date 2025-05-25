@@ -7,8 +7,6 @@ import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Enumeration;
-import java.util.Hashtable;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Server {
@@ -17,19 +15,16 @@ public class Server {
     private ServerSocket serverSocket;
     private String adress;
     private int porta;
-    //public Hashtable<Socket, ObjectOutputStream> outputStreams;
-    //public Hashtable<String, ObjectOutputStream> clients;
     private ObjectOutputStream outputCliente;
     private AtomicBoolean running;
     private ControladorRaspberry cr;
-    private Integer id = 0;
+
 
     public Server(String adress, int porta) {
         this.adress = adress;
         this.porta = porta;
     }
 
-    //Waiting for clients to connect
     public void ligarServidor() {
 
         try {
@@ -69,7 +64,8 @@ public class Server {
         System.out.println("Comando recebido: " + mensagem);
 
         if (mensagem.startsWith("#s")) {
-            cr = new ControladorRaspberry(this);
+            var color = mensagem.substring(4);
+            cr = new ControladorRaspberry(this, getCor(color));
             cr.start();
         }
         if (mensagem.startsWith("#p")) {
@@ -88,29 +84,18 @@ public class Server {
         }
     }
 
-
-    /*public void sendToAll(String data) {
-        for (Enumeration<ObjectOutputStream> e = getOutputStreams(); e.hasMoreElements(); ) {
-            //since we don't want server to remove one client and at the same time sending message to it
-            synchronized (outputStreams) {
-                ObjectOutputStream tempOutput = e.nextElement();
-                new Thread(() -> {
-                    try {
-                        tempOutput.writeObject(data);
-                        tempOutput.flush();
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }).start();
-            }
+    private int getCor(String color) {
+        switch (color) {
+            case "vermelho":
+                return 1;
+            case "verde":
+                return 2;
+            case "azul":
+                return 3;
+            default:
+                return 0;
         }
-    }*/
-
-    /*//To get Output Stream of the available clients from the hash table
-    private Enumeration<ObjectOutputStream> getOutputStreams() {
-        return outputStreams.elements();
-    }*/
-
+    }
 
     public synchronized void send(String message) {
         new Thread(() -> {
@@ -120,7 +105,7 @@ public class Server {
 
                 System.out.println(message);
             } catch (IOException e) {
-                System.out.println("Erro ao enviar msg metodo Send");
+                System.err.println("Erro ao enviar msg \"metodo Send\"");
             }
         }).start();
     }
@@ -141,17 +126,6 @@ public class Server {
         return this.running.get();
     }
 
-    public Integer getId() {
-        return id;
-    }
-
-    public void addId() {
-        this.id++;
-    }
-
-    public ObjectOutputStream getOutputCliente() {
-        return outputCliente;
-    }
 
     public void setOutputCliente(ObjectOutputStream outputCliente) {
         this.outputCliente = outputCliente;
