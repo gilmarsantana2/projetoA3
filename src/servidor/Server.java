@@ -1,6 +1,7 @@
 package servidor;
 
 import controlador.ControladorRaspberry;
+import data.MessageData;
 
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -18,6 +19,10 @@ public class Server {
     private ObjectOutputStream outputCliente;
     private AtomicBoolean running;
     private ControladorRaspberry cr;
+
+    private int countRed = 0;
+    private int countBlue = 0;
+    private int countGreen = 0;
 
 
     public Server(String adress, int porta) {
@@ -60,55 +65,57 @@ public class Server {
      * #x -> Sair da aplicação
      */
 
-    public void tratarComando(String mensagem) {
-        System.out.println("Comando recebido: " + mensagem);
+    public void tratarComando(MessageData data) {
+        System.out.println("Comando recebido: " + data.getComando().name());
 
-        if (mensagem.startsWith("#s")) {
-            var color = mensagem.substring(4);
-            cr = new ControladorRaspberry(this, getCor(color));
-            cr.start();
-        }
-        if (mensagem.startsWith("#p")) {
-            cr.pararMotor(false);
-            cr.alarmRunning.set(false);
-        }
-        if (mensagem.startsWith("#a")) {
-            cr.alarmeStarted.set(false);
-            cr.alarmRunning.set(false);
-        }
-        if (mensagem.startsWith("#x")) {
-            cr.pararMotor(false);
-            cr.cleanup();
-            desligarServer();
-            System.exit(0);
+        var comando = data.getComando();
+
+        switch (comando) {
+            case INICIAR: {
+                System.out.println("Cor Selecionada: " + data.getCorSelecionada().name());
+                cr = new ControladorRaspberry(this, data.getCorSelecionada());
+                cr.start();
+                break;
+            }
+            case PARAR_MOTOR: {
+                cr.pararMotor(false);
+                cr.alarmRunning.set(false);
+                break;
+            }
+            case PARAR_ALARME: {
+                cr.alarmeStarted.set(false);
+                cr.alarmRunning.set(false);
+                break;
+            }
+            case SAIR: {
+                cr.pararMotor(false);
+                cr.cleanup();
+                desligarServer();
+                System.exit(0);
+                break;
+            }
+            case RESET: {
+                countBlue = 0;
+                countGreen = 0;
+                countRed = 0;
+            }
+            default: {
+                break;
+            }
         }
     }
 
-    private int getCor(String color) {
-        switch (color) {
-            case "vermelho":
-                return 1;
-            case "verde":
-                return 2;
-            case "azul":
-                return 3;
-            default:
-                return 0;
-        }
-    }
-
-    public synchronized void send(String message) {
+    public synchronized void send(MessageData message) {
         new Thread(() -> {
             try {
-                outputCliente.writeObject(message);
+                outputCliente.writeUnshared(message);
                 outputCliente.flush();
-
-                System.out.println(message);
             } catch (IOException e) {
-                System.err.println("Erro ao enviar msg \"metodo Send\"");
+                System.err.println("Erro ao enviar msg \"metodo Send\" " + e.getMessage());
             }
         }).start();
     }
+
 
     public boolean desligarServer() {
         try {
@@ -129,5 +136,29 @@ public class Server {
 
     public void setOutputCliente(ObjectOutputStream outputCliente) {
         this.outputCliente = outputCliente;
+    }
+
+    public int getCountRed() {
+        return countRed;
+    }
+
+    public void addRed() {
+        this.countRed++;
+    }
+
+    public int getCountBlue() {
+        return countBlue;
+    }
+
+    public void addBlue() {
+        this.countBlue++;
+    }
+
+    public int getCountGreen() {
+        return countGreen;
+    }
+
+    public void addGreen() {
+        this.countGreen++;
     }
 }

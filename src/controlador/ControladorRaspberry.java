@@ -1,5 +1,6 @@
 package controlador;
 
+import data.MessageData;
 import servidor.Server;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -12,7 +13,8 @@ public class ControladorRaspberry extends Thread {
     public AtomicBoolean alarmeStarted;
     private AtomicBoolean running;
     public AtomicBoolean alarmRunning;
-    private int cor; //Cor selecionada pelo usuário
+    private int corNum;
+    private MessageData.Colors colorName;//Cor selecionada pelo usuário
 
     //Pinagem da placa Raspberry Usando codificação Wiring
     private static final int PIN_LED_RED = 0;
@@ -28,13 +30,14 @@ public class ControladorRaspberry extends Thread {
     private static final int BUZZER_IO = 6;
     private static final int MOTOR_PIN = 21;
 
-    public ControladorRaspberry(Server server, int cor) {
+    public ControladorRaspberry(Server server, MessageData.Colors cor) {
         this.pi = new NativeWiringPI();
         this.server = server;
         alarmeStarted = new AtomicBoolean(false);
         running = new AtomicBoolean(true);
         alarmRunning = new AtomicBoolean(true);
-        this.cor = cor;
+        this.colorName = cor;
+        this.corNum = getCor(colorName);
     }
 
     //Configuração e inicialização dos pinos
@@ -90,26 +93,25 @@ public class ControladorRaspberry extends Thread {
             var vermelho = lerVermelho();
             var azul = lerAzul();
             var verde = lerVerde();
-            if (vermelho > azul && vermelho > verde) {
+            if (vermelho >= 10 && verde >= 10 && azul >= 10) {
+                System.out.println("Aguardando peça...");
+            } else if (vermelho > azul && vermelho > verde) {
                 System.out.println("Vermelho Detectado");
-                countRed++;
-                resultado("#r", "Vermelho");
+                server.addRed();
                 pi.digitalWrite(PIN_LED_RED, NativeWiringPI.STATE_HIGH);
                 pi.digitalWrite(PIN_LED_BLUE, NativeWiringPI.STATE_LOW);
                 pi.digitalWrite(PIN_LED_GREEN, NativeWiringPI.STATE_LOW);
                 aproveColor(1);
             } else if (azul > vermelho && azul > verde) {
                 System.out.println("Azul Detectado");
-                countBlue++;
-                resultado("#r", "Azul");
+                server.addBlue();
                 pi.digitalWrite(PIN_LED_BLUE, NativeWiringPI.STATE_HIGH);
                 pi.digitalWrite(PIN_LED_RED, NativeWiringPI.STATE_LOW);
                 pi.digitalWrite(PIN_LED_GREEN, NativeWiringPI.STATE_LOW);
                 aproveColor(3);
             } else if (verde > vermelho && verde > azul) {
                 System.out.println("Verde Detectado");
-                countGreen++;
-                resultado("#r", "Verde");
+                server.addGreen();
                 pi.digitalWrite(PIN_LED_GREEN, NativeWiringPI.STATE_HIGH);
                 pi.digitalWrite(PIN_LED_BLUE, NativeWiringPI.STATE_LOW);
                 pi.digitalWrite(PIN_LED_RED, NativeWiringPI.STATE_LOW);
@@ -146,25 +148,26 @@ public class ControladorRaspberry extends Thread {
     }
 
     public void pararMotor(boolean falha) {
-        if (falha){
-            //todo parar motor
+        if (falha) {
             pi.digitalWrite(MOTOR_PIN, NativeWiringPI.STATE_LOW);
-            resultado("#f", null);
+            alarmeStarted.set(true);
+            resultado(MessageData.Comandos.FALHA);
             running.set(false);
-        }else {
-            //todo
+        } else {
             pi.digitalWrite(MOTOR_PIN, NativeWiringPI.STATE_LOW);
             running.set(false);
             System.out.println("Motor Pausado Pelo Operador!");
         }
     }
 
+    private final long tempoSono = 200L;
+
     //Script para leitura de cores
     public long lerVermelho() {
         pi.digitalWrite(PIN_S2, NativeWiringPI.STATE_LOW);
         pi.digitalWrite(PIN_S3, NativeWiringPI.STATE_LOW);
         try {
-            Thread.sleep(300);
+            Thread.sleep(tempoSono);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -192,7 +195,7 @@ public class ControladorRaspberry extends Thread {
         pi.digitalWrite(PIN_S2, NativeWiringPI.STATE_LOW);
         pi.digitalWrite(PIN_S3, NativeWiringPI.STATE_HIGH);
         try {
-            Thread.sleep(300);
+            Thread.sleep(tempoSono);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -220,7 +223,7 @@ public class ControladorRaspberry extends Thread {
         pi.digitalWrite(PIN_S2, NativeWiringPI.STATE_HIGH);
         pi.digitalWrite(PIN_S3, NativeWiringPI.STATE_HIGH);
         try {
-            Thread.sleep(300);
+            Thread.sleep(tempoSono);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -245,20 +248,17 @@ public class ControladorRaspberry extends Thread {
     }
 
     //Mensagem enviada ao celular sobre a leitura dos sensores
-    private int countRed = 0;
-    private int countBlue = 0;
-    private int countGreen = 0;
 
-    public void resultado(String resumo, String cor) {
+
+    public void resultado(MessageData.Comandos comando) {
         new Thread(() -> {
-            StringBuilder sb = new StringBuilder(resumo);
-            sb.append("Resumo de Scaneamento!");
-            sb.append("\nSelecionada a cor: ").append(cor);
-            sb.append("\nPeças Azuis detectadas: ").append(countBlue);
-            sb.append("\nPeças Verdes detectadas: ").append(countGreen);
-            sb.append("\nPeças Vermelhas detectadas: ").append(countRed);
-
-            server.send(sb.toString());
+            var data = new MessageData(comando);
+            data.setBlueCount(server.getCountBlue());
+            data.setRedCount(server.getCountRed());
+            data.setGreenCount(server.getCountGreen());
+            data.setCorSelecionada(colorName);
+            System.out.println(data);
+            server.send(data);
         }).start();
     }
 
@@ -268,10 +268,24 @@ public class ControladorRaspberry extends Thread {
      * 3 -> Azul
      */
 
-    private void aproveColor(int colorToAprove){
-        if (cor != colorToAprove){
+    private void aproveColor(int colorToAprove) {
+        if (corNum == colorToAprove) {
+            resultado(MessageData.Comandos.RESULTADO);
+        } else {
             pararMotor(true);
-            alarmeStarted.set(true);
+        }
+    }
+
+    private int getCor(MessageData.Colors color) {
+        switch (color) {
+            case VERMELHO:
+                return 1;
+            case VERDE:
+                return 2;
+            case AZUL:
+                return 3;
+            default:
+                return 0;
         }
     }
 }

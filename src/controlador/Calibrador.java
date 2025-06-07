@@ -49,25 +49,18 @@ public class Calibrador {
             System.out.println("Valor de Vermelho: " + vermelho);
             System.out.println("Valor de Verde: " + verde);
             System.out.println("Valor de Azul: " + azul);
-            if (vermelho >= 10 && verde < 5 && azul < 5) {
+
+            if (vermelho > azul && vermelho > verde) {//vermelho > azul && vermelho > verde; vermelho >= 10 && verde < 5 && azul < 5
                 System.out.println("Vermelho Detectado!");
-            }
-            if (verde >= 10 && vermelho < 6 && azul < 6) {
+            } else if (verde >= 10 && vermelho < 6 && azul < 6) {
                 System.out.println("Verde Detectado!");
-            }
-            if (azul >= 10 && vermelho < 3 && verde < 6) {
+            } else if (azul >= 10 && vermelho < 3 && verde < 6) {
                 System.out.println("Azul Detectado!");
-            }
-            if (vermelho > 15 && verde >= 5 && verde < 10 && azul < 6) {
-                System.out.println("Laranja Detectado!");
-            }
-            if (vermelho > 15 && verde > 10 && azul < 10) {
+            } else if (vermelho > 15 && verde > 10 && azul < 10) {
                 System.out.println("Amarelo Detectado!");
-            }
-            if (vermelho > 15 && verde > 15 && azul > 15) {
+            } else if (vermelho >= 10 && verde >= 10 && azul >= 10) {
                 System.out.println("Branco Detectado!");
-            }
-            if (vermelho<5 && verde <5 && azul< 5){
+            } else if (vermelho < 5 && verde < 5 && azul < 5) {
                 System.out.println("Preto Detectado!");
             }
         }
@@ -110,11 +103,14 @@ public class Calibrador {
         pi.cleanup(BUZZER_IO);
     }
 
+    private final long tempoSono = 200L;
+    //private final int qulso = 10;
+
     public long lerVermelho() {
         pi.digitalWrite(PIN_S2, NativeWiringPI.STATE_LOW);
         pi.digitalWrite(PIN_S3, NativeWiringPI.STATE_LOW);
         try {
-            Thread.sleep(300);
+            Thread.sleep(tempoSono);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -143,7 +139,7 @@ public class Calibrador {
         pi.digitalWrite(PIN_S2, NativeWiringPI.STATE_LOW);
         pi.digitalWrite(PIN_S3, NativeWiringPI.STATE_HIGH);
         try {
-            Thread.sleep(300);
+            Thread.sleep(tempoSono);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -171,7 +167,7 @@ public class Calibrador {
         pi.digitalWrite(PIN_S2, NativeWiringPI.STATE_HIGH);
         pi.digitalWrite(PIN_S3, NativeWiringPI.STATE_HIGH);
         try {
-            Thread.sleep(300);
+            Thread.sleep(tempoSono);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

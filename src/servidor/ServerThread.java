@@ -1,5 +1,7 @@
 package servidor;
 
+import data.MessageData;
+
 import java.io.*;
 import java.net.Socket;
 
@@ -21,6 +23,7 @@ public class ServerThread extends Thread {
             output.flush();
             input = new ObjectInputStream(this.socket.getInputStream());
             server.setOutputCliente(output);
+            server.send(new MessageData(MessageData.Comandos.CONECTION_OK));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -28,10 +31,10 @@ public class ServerThread extends Thread {
 
     @Override
     public void run() {
-        String message = "";
+        MessageData message;
         while (server.isRunning()) {
             try {
-                message = (String) input.readObject();
+                message = (MessageData) input.readUnshared();
                 if (message != null) server.tratarComando(message);
             } catch (Exception e) {
                 break;
